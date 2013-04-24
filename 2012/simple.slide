@@ -17,6 +17,12 @@ Google Inc.
 adg@golang.org
 http://golang.org
 
+* Video
+
+A video of this talk was recorded at Øredev in Malmö, Sweden in November 2012.
+
+.link http://vimeo.com/53221558 Watch the talk on Vimeo
+
 * Background
 
 * Why a new language?
@@ -80,7 +86,7 @@ The `io` package provides fundamental I/O interfaces that are used throughout mo
 
 The most ubiquitous are the `Reader` and `Writer` types, which describe streams of data.
 
-.code simple/io.go
+.code simple/io/io.go
 
 `Reader` and `Writer` implementations include files, sockets, (de)compressors, image and JSON codecs, and many more.
 
@@ -215,7 +221,7 @@ Saves a _huge_ amount of time.
 
 The `go` tool and the `testing` package provide a lightweight test framework.
 
-.code simple/string_test.go /func TestIndex/,/^}/
+.code simple/test/string_test.go /func TestIndex/,/^}/
 
 * Tests: running
 
@@ -239,7 +245,7 @@ The `testing` package also supports benchmarks.
 	
 A sample benchmark function:
 
-.code simple/string_test.go /func BenchmarkIndex/,/^}/
+.code simple/test/string_test.go /func BenchmarkIndex/,/^}/
  
 The benchmark package will vary `b.N` until the benchmark function lasts long enough to be timed reliably.
 
@@ -251,7 +257,7 @@ The benchmark package will vary `b.N` until the benchmark function lasts long en
 
 The `testing` package also supports testable examples.
 
-.code simple/string_test.go /func ExampleIndex/,/^}/
+.code simple/test/string_test.go /func ExampleIndex/,/^}/
 
 Examples and built and run as part of the normal test suite:
 

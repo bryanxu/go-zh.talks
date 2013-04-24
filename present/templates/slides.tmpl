@@ -47,7 +47,9 @@
       </article>
 
   </body>
-  <script src='/static/playground.js'></script>
+  {{if .PlayEnabled}}
+  <script src='/play.js'></script>
+  {{end}}
 </html>
 {{end}}
 

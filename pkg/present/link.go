@@ -21,7 +21,7 @@ type Link struct {
 
 func (l Link) TemplateName() string { return "link" }
 
-func parseLink(fileName string, lineno int, text string) (Elem, error) {
+func parseLink(ctx *Context, fileName string, lineno int, text string) (Elem, error) {
 	args := strings.Fields(text)
 	url, err := url.Parse(args[1])
 	if err != nil {
@@ -61,7 +61,7 @@ func parseInlineLink(s string) (link string, length int) {
 	}
 	urlEnd := strings.Index(s, "]")
 	url := s[2:urlEnd]
-	const badURLChars = `<>"{}|\^~[] ` + "`" // per RFC1738 section 2.2
+	const badURLChars = `<>"{}|\^[] ` + "`" // per RFC2396 section 2.4.3
 	if strings.ContainsAny(url, badURLChars) {
 		return
 	}

@@ -4,32 +4,39 @@
 
 // +build !appengine
 
-package main
+// Package socket implements an WebSocket-based playground backend.
+// Clients connect to a websocket handler and send run/kill commands, and
+// the server sends the output and exit status of the running processes.
+// Multiple clients running multiple processes may be served concurrently.
+// The wire format is JSON and is described by the Message type.
+//
+// This will not run on App Engine as WebSockets are not supported there.
+package socket
 
 import (
+	"bytes"
 	"encoding/json"
+	"io"
 	"io/ioutil"
 	"log"
-	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strconv"
+	"unicode/utf8"
 
 	"code.google.com/p/go.net/websocket"
 )
 
-const (
-	socketPresent = true // tell main.go that socket is implemented
-	msgLimit      = 1000 // max number of messages to send per session
-)
+// Handler implements a WebSocket handler for a client connection.
+var Handler = websocket.Handler(socketHandler)
 
-// HandleSocket registers the websocket handler with http.DefaultServeMux
-// under the given path.
-func HandleSocket(path string) {
-	http.Handle(path, websocket.Handler(socketHandler))
-}
+// Environ, if non-nil, is used to provide an environment to go command and
+// user binary invocations.
+var Environ func() []string
+
+const msgLimit = 1000 // max number of messages to send per session
 
 // Message is the wire format for the websocket connection to the browser.
 // It is used for both sending output messages and receiving commands, as
@@ -42,7 +49,7 @@ type Message struct {
 
 // socketHandler handles the websocket connection for a given present session.
 // It handles transcoding Messages to and from JSON format, and starting
-// and killing Processes.
+// and killing processes.
 func socketHandler(c *websocket.Conn) {
 	in, out := make(chan *Message), make(chan *Message)
 	errc := make(chan error, 1)
@@ -71,8 +78,8 @@ func socketHandler(c *websocket.Conn) {
 		}
 	}()
 
-	// Start and kill Processes and handle errors.
-	proc := make(map[string]*Process)
+	// Start and kill processes and handle errors.
+	proc := make(map[string]*process)
 	for {
 		select {
 		case m := <-in:
@@ -80,13 +87,15 @@ func socketHandler(c *websocket.Conn) {
 			case "run":
 				proc[m.Id].Kill()
 				lOut := limiter(in, out)
-				proc[m.Id] = StartProcess(m.Id, m.Body, lOut)
+				proc[m.Id] = startProcess(m.Id, m.Body, lOut)
 			case "kill":
 				proc[m.Id].Kill()
 			}
 		case err := <-errc:
-			// A encode or decode has failed; bail.
-			log.Println(err)
+			if err != io.EOF {
+				// A encode or decode has failed; bail.
+				log.Println(err)
+			}
 			// Shut down any running processes.
 			for _, p := range proc {
 				p.Kill()
@@ -96,18 +105,18 @@ func socketHandler(c *websocket.Conn) {
 	}
 }
 
-// Process represents a running process.
-type Process struct {
+// process represents a running process.
+type process struct {
 	id   string
 	out  chan<- *Message
 	done chan struct{} // closed when wait completes
 	run  *exec.Cmd
 }
 
-// StartProcess builds and runs the given program, sending its output
+// startProcess builds and runs the given program, sending its output
 // and end event as Messages on the provided channel.
-func StartProcess(id, body string, out chan<- *Message) *Process {
-	p := &Process{
+func startProcess(id, body string, out chan<- *Message) *process {
+	p := &process{
 		id:   id,
 		out:  out,
 		done: make(chan struct{}),
@@ -121,7 +130,7 @@ func StartProcess(id, body string, out chan<- *Message) *Process {
 }
 
 // Kill stops the process if it is running and waits for it to exit.
-func (p *Process) Kill() {
+func (p *process) Kill() {
 	if p == nil {
 		return
 	}
@@ -131,7 +140,7 @@ func (p *Process) Kill() {
 
 // start builds and starts the given program, sending its output to p.out,
 // and stores the running *exec.Cmd in the run field.
-func (p *Process) start(body string) error {
+func (p *process) start(body string) error {
 	// We "go build" and then exec the binary so that the
 	// resultant *exec.Cmd is a handle to the user's program
 	// (rather than the go tool process).
@@ -154,6 +163,7 @@ func (p *Process) start(body string) error {
 	defer os.Remove(bin)
 	dir, file := filepath.Split(src)
 	cmd := p.cmd(dir, "go", "build", "-o", bin, file)
+	cmd.Stdout = cmd.Stderr // send compiler output to stderr
 	if err := cmd.Run(); err != nil {
 		return err
 	}
@@ -169,14 +179,14 @@ func (p *Process) start(body string) error {
 
 // wait waits for the running process to complete
 // and sends its error state to the client.
-func (p *Process) wait() {
+func (p *process) wait() {
 	p.end(p.run.Wait())
 	close(p.done) // unblock waiting Kill calls
 }
 
 // end sends an "end" message to the client, containing the process id and the
 // given error value.
-func (p *Process) end(err error) {
+func (p *process) end(err error) {
 	m := &Message{Id: p.id, Kind: "end"}
 	if err != nil {
 		m.Body = err.Error()
@@ -185,10 +195,13 @@ func (p *Process) end(err error) {
 }
 
 // cmd builds an *exec.Cmd that writes its standard output and error to the
-// Process' output channel.
-func (p *Process) cmd(dir string, args ...string) *exec.Cmd {
+// process' output channel.
+func (p *process) cmd(dir string, args ...string) *exec.Cmd {
 	cmd := exec.Command(args[0], args[1:]...)
 	cmd.Dir = dir
+	if Environ != nil {
+		cmd.Env = Environ()
+	}
 	cmd.Stdout = &messageWriter{p.id, "stdout", p.out}
 	cmd.Stderr = &messageWriter{p.id, "stderr", p.out}
 	return cmd
@@ -202,8 +215,22 @@ type messageWriter struct {
 }
 
 func (w *messageWriter) Write(b []byte) (n int, err error) {
-	w.out <- &Message{Id: w.id, Kind: w.kind, Body: string(b)}
+	w.out <- &Message{Id: w.id, Kind: w.kind, Body: safeString(b)}
 	return len(b), nil
+}
+
+// safeString returns b as a valid UTF-8 string.
+func safeString(b []byte) string {
+	if utf8.Valid(b) {
+		return string(b)
+	}
+	var buf bytes.Buffer
+	for len(b) > 0 {
+		r, size := utf8.DecodeRune(b)
+		b = b[size:]
+		buf.WriteRune(r)
+	}
+	return buf.String()
 }
 
 // limiter returns a channel that wraps dest. Messages sent to the channel are
@@ -221,7 +248,7 @@ func limiter(kill chan<- *Message, dest chan<- *Message) chan<- *Message {
 					return
 				}
 			case n == msgLimit:
-				// Process produced too much output. Kill it.
+				// process produced too much output. Kill it.
 				kill <- &Message{Id: m.Id, Kind: "kill"}
 			}
 			n++

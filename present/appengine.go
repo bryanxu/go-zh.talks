@@ -6,10 +6,14 @@
 
 package main
 
-const socketPresent = false // no websockets or compilation on app engine (yet)
+import (
+	_ "code.google.com/p/go.talks/pkg/playground"
+	"code.google.com/p/go.talks/pkg/present"
+)
 
 var basePath = "./present/"
 
-func HandleSocket(path string) {
-	panic("websockets not supported on app engine")
+func init() {
+	playScript(basePath, "jquery.js", "playground.js")
+	present.PlayEnabled = true
 }

@@ -1,4 +1,4 @@
-// Copyright 2012 The Go Authors.  All rights reserved.
+// Copyright 2013 The Go Authors.  All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
@@ -16,6 +16,7 @@ import (
 	"strings"
 
 	"code.google.com/p/go.talks/pkg/present"
+	"code.google.com/p/go.talks/pkg/socket"
 )
 
 const basePkg = "code.google.com/p/go.talks/present"
@@ -28,10 +29,6 @@ func main() {
 	flag.BoolVar(&present.PlayEnabled, "play", true, "enable playground (permit execution of arbitrary user code)")
 	flag.Parse()
 
-	if !socketPresent {
-		present.PlayEnabled = false
-	}
-
 	if basePath == "" {
 		p, err := build.Default.Import(basePkg, "", build.FindOnly)
 		if err != nil {
@@ -43,7 +40,8 @@ func main() {
 	}
 
 	if present.PlayEnabled {
-		HandleSocket("/socket")
+		playScript(basePath, "socket.js")
+		http.Handle("/socket", socket.Handler)
 	}
 	http.Handle("/static/", http.FileServer(http.Dir(basePath)))
 

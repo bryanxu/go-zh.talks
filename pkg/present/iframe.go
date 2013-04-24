@@ -1,4 +1,4 @@
-// Copyright 2012 The Go Authors. All rights reserved.
+// Copyright 2013 The Go Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
@@ -10,20 +10,20 @@ import (
 )
 
 func init() {
-	Register("image", parseImage)
+	Register("iframe", parseIframe)
 }
 
-type Image struct {
+type Iframe struct {
 	URL    string
 	Width  int
 	Height int
 }
 
-func (i Image) TemplateName() string { return "image" }
+func (i Iframe) TemplateName() string { return "iframe" }
 
-func parseImage(ctx *Context, fileName string, lineno int, text string) (Elem, error) {
+func parseIframe(ctx *Context, fileName string, lineno int, text string) (Elem, error) {
 	args := strings.Fields(text)
-	img := Image{URL: args[1]}
+	i := Iframe{URL: args[1]}
 	a, err := parseArgs(fileName, lineno, args[2:])
 	if err != nil {
 		return nil, err
@@ -33,13 +33,13 @@ func parseImage(ctx *Context, fileName string, lineno int, text string) (Elem, e
 		// no size parameters
 	case 2:
 		if v, ok := a[0].(int); ok {
-			img.Height = v
+			i.Height = v
 		}
 		if v, ok := a[1].(int); ok {
-			img.Width = v
+			i.Width = v
 		}
 	default:
 		return nil, fmt.Errorf("incorrect image invocation: %q", text)
 	}
-	return img, nil
+	return i, nil
 }
