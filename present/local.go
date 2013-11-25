@@ -15,8 +15,8 @@ import (
 	"os"
 	"strings"
 
-	"code.google.com/p/go.talks/pkg/present"
-	"code.google.com/p/go.talks/pkg/socket"
+	"code.google.com/p/go.tools/playground/socket"
+	"code.google.com/p/go.tools/present"
 )
 
 const basePkg = "code.google.com/p/go.talks/present"
@@ -40,7 +40,7 @@ func main() {
 	}
 
 	if present.PlayEnabled {
-		playScript(basePath, "socket.js")
+		playScript(basePath, "SocketTransport")
 		http.Handle("/socket", socket.Handler)
 	}
 	http.Handle("/static/", http.FileServer(http.Dir(basePath)))
@@ -53,6 +53,10 @@ func main() {
 
 	log.Printf("Open your web browser and visit http://%s/", *httpListen)
 	log.Fatal(http.ListenAndServe(*httpListen, nil))
+}
+
+func playable(c present.Code) bool {
+	return present.PlayEnabled && c.Play
 }
 
 const basePathMessage = `

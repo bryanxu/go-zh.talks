@@ -14,7 +14,7 @@ import (
 	"path/filepath"
 	"sort"
 
-	"code.google.com/p/go.talks/pkg/present"
+	"code.google.com/p/go.tools/present"
 )
 
 func init() {
@@ -81,6 +81,7 @@ func renderDoc(w io.Writer, base, docFile string) error {
 
 	// Read and parse the input.
 	tmpl := present.Template()
+	tmpl = tmpl.Funcs(template.FuncMap{"playable": playable})
 	if _, err := tmpl.ParseFiles(actionTmpl, contentTmpl); err != nil {
 		return err
 	}
@@ -128,7 +129,7 @@ func dirList(w io.Writer, name string) (isDir bool, err error) {
 		}
 		e := dirEntry{
 			Name: fi.Name(),
-			Path: filepath.Join(name, fi.Name()),
+			Path: filepath.ToSlash(filepath.Join(name, fi.Name())),
 		}
 		if fi.IsDir() && showDir(e.Name) {
 			d.Dirs = append(d.Dirs, e)
@@ -160,7 +161,7 @@ func dirList(w io.Writer, name string) (isDir bool, err error) {
 	return true, dirListTemplate.Execute(w, d)
 }
 
-// showFile returns whether the given file should be displayed in the list.
+// showFile reports whether the given file should be displayed in the list.
 func showFile(n string) bool {
 	switch filepath.Ext(n) {
 	case ".pdf":
@@ -172,7 +173,7 @@ func showFile(n string) bool {
 	return true
 }
 
-// showDir returns whether the given directory should be displayed in the list.
+// showDir reports whether the given directory should be displayed in the list.
 func showDir(n string) bool {
 	if len(n) > 0 && (n[0] == '.' || n[0] == '_') || n == "present" {
 		return false

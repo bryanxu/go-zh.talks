@@ -7,13 +7,18 @@
 package main
 
 import (
-	_ "code.google.com/p/go.talks/pkg/playground"
-	"code.google.com/p/go.talks/pkg/present"
+	"code.google.com/p/go.tools/present"
+
+	_ "code.google.com/p/go.tools/playground"
 )
 
 var basePath = "./present/"
 
 func init() {
-	playScript(basePath, "jquery.js", "playground.js")
+	playScript(basePath, "HTTPTransport")
 	present.PlayEnabled = true
+}
+
+func playable(c present.Code) bool {
+	return present.PlayEnabled && c.Play && c.Ext == ".go"
 }

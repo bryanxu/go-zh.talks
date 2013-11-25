@@ -1,3 +1,5 @@
+// +build OMIT
+
 package main
 
 import "fmt"
@@ -7,7 +9,7 @@ func f(left, right chan int) {
 }
 
 func main() {
-	const n = 100000
+	const n = 10000
 	leftmost := make(chan int)
 	right := leftmost
 	left := leftmost

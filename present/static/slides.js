@@ -195,10 +195,6 @@ function updateSlides() {
   enableSlideFrames(curSlide - 1);
   enableSlideFrames(curSlide + 2);
   
-  if (isChromeVoxActive()) {
-    speakAndSyncToNode(slideEls[curSlide]);
-  }  
-
   updateHash();
 };
 
@@ -277,6 +273,7 @@ function handleTouchMove(event) {
   } else {
     touchDX = event.touches[0].pageX - touchStartX;
     touchDY = event.touches[0].pageY - touchStartY;
+    event.preventDefault();
   }
 };
 
@@ -299,6 +296,26 @@ function cancelTouch() {
   document.body.removeEventListener('touchmove', handleTouchMove, true);
   document.body.removeEventListener('touchend', handleTouchEnd, true);  
 };
+
+/* Mouse wheel events */
+
+// Used to limit the number of slides advanced.
+var tooSoon = false;
+
+function handleMouseWheel(event) {
+  event.preventDefault();
+  if (tooSoon) return;
+
+  // FireFox exposes delta in detail, instead of wheelDelta.
+  var delta = event.wheelDelta ? event.wheelDelta : -event.detail;
+  // Scrolling down or left means next.
+  if (delta > 0) nextSlide();
+  // Scrolling up or right means previous.
+  if (delta < 0) prevSlide();
+
+  tooSoon = true;
+  setTimeout(function() { tooSoon = false;}, 250);
+}
 
 /* Preloading frames */
 
@@ -368,73 +385,13 @@ function setupInteraction() {
   /* Swiping */
   
   document.body.addEventListener('touchstart', handleTouchStart, false);
+
+  /* Scrolling */
+
+  document.body.addEventListener('mousewheel', handleMouseWheel, false);
+  // Needed for FireFox (Gecko)
+  document.body.addEventListener('DOMMouseScroll', handleMouseWheel, false);
 }
-
-/* ChromeVox support */
-
-function isChromeVoxActive() {
-  if (typeof(cvox) == 'undefined') {
-    return false;
-  } else {
-    return true;
-  }
-};
-
-function speakAndSyncToNode(node) {
-  if (!isChromeVoxActive()) {
-    return;
-  }
-  
-  cvox.ChromeVox.navigationManager.switchToStrategy(
-      cvox.ChromeVoxNavigationManager.STRATEGIES.LINEARDOM, 0, true);  
-  cvox.ChromeVox.navigationManager.syncToNode(node);
-  cvox.ChromeVoxUserCommands.finishNavCommand('');
-  var target = node;
-  while (target.firstChild) {
-    target = target.firstChild;
-  }
-  cvox.ChromeVox.navigationManager.syncToNode(target);
-};
-
-function speakNextItem() {
-  if (!isChromeVoxActive()) {
-    return;
-  }
-  
-  cvox.ChromeVox.navigationManager.switchToStrategy(
-      cvox.ChromeVoxNavigationManager.STRATEGIES.LINEARDOM, 0, true);
-  cvox.ChromeVox.navigationManager.next(true);
-  if (!cvox.DomUtil.isDescendantOfNode(
-      cvox.ChromeVox.navigationManager.getCurrentNode(), slideEls[curSlide])){
-    var target = slideEls[curSlide];
-    while (target.firstChild) {
-      target = target.firstChild;
-    }
-    cvox.ChromeVox.navigationManager.syncToNode(target);
-    cvox.ChromeVox.navigationManager.next(true);
-  }
-  cvox.ChromeVoxUserCommands.finishNavCommand('');
-};
-
-function speakPrevItem() {
-  if (!isChromeVoxActive()) {
-    return;
-  }
-  
-  cvox.ChromeVox.navigationManager.switchToStrategy(
-      cvox.ChromeVoxNavigationManager.STRATEGIES.LINEARDOM, 0, true);
-  cvox.ChromeVox.navigationManager.previous(true);
-  if (!cvox.DomUtil.isDescendantOfNode(
-      cvox.ChromeVox.navigationManager.getCurrentNode(), slideEls[curSlide])){
-    var target = slideEls[curSlide];
-    while (target.lastChild){
-      target = target.lastChild;
-    }
-    cvox.ChromeVox.navigationManager.syncToNode(target);
-    cvox.ChromeVox.navigationManager.previous(true);
-  }
-  cvox.ChromeVoxUserCommands.finishNavCommand('');
-};
 
 /* Hash functions */
 
@@ -478,21 +435,13 @@ function handleBodyKeyDown(event) {
 
     case 40: // down arrow
       if (inCode) break;
-      if (isChromeVoxActive()) {
-        speakNextItem();
-      } else {
-        nextSlide();
-      }
+      nextSlide();
       event.preventDefault();
       break;
 
     case 38: // up arrow
       if (inCode) break;
-      if (isChromeVoxActive()) {
-        speakPrevItem();
-      } else {
-        prevSlide();
-      }
+      prevSlide();
       event.preventDefault();
       break;
   }

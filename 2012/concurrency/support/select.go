@@ -1,7 +1,9 @@
+// +build OMIT
+
 package main
 
-func main()
-	var c1 c2 c2 chan int
+func main() {
+	var c1, c2, c3 chan int
 	// START0 OMIT
 	select {
 	case v1 := <-c1:
